@@ -2,6 +2,7 @@ from picamera import PiCamera
 import time
 import datetime
 import cv2
+import os
 import requests
 import RPi.GPIO as GPIO
 from git import Repo
@@ -16,8 +17,8 @@ def git_push (dat) :
 	repo_dir = '.'										# Define repo_dir which is same as the file directory
 	repo = Repo(repo_dir)									# Create Repo object with the repo directory
 	file_list = [												
-		'/home/pi/Documents/Raspberrypi/image_%s.jpg' % dat,				# List files which are to b pushed
-		'/home/pi/Documents/Raspberrypi/thumb_%s.jpg' % dat
+		os.path.join(os.getcwd(),'image_%s.jpg' % dat),				# List files which are to be pushed
+		os.path.join(os.getcwd(),'thumb_%s.jpg' % dat)
 	]
 	commit_message = 'push image_%s' % dat							# commit message	
 	repo.index.add(file_list)								# add files 
@@ -47,8 +48,8 @@ def send_to_phone(dat, message) :
 			},
 			{
 				"type": "image",
-				"originalContentUrl": "https://namanjain10.github.io/Raspberrypi/image_%s.jpg" % dat,	# Links for Images
-				"previewImageUrl": "https://namanjain10.github.io/Raspberrypi/thumb_%s.jpg" % dat       	
+				"originalContentUrl": "https://yaksh-bot.github.io/Yaksha/image_%s.jpg" % dat,	# Links for Images
+				"previewImageUrl": "https://yaksh-bot.github.io/Yaksha/thumb_%s.jpg" % dat       	
 			}
 		]
 	}
@@ -72,7 +73,7 @@ def capture() :
 	cam_var = 1										# Set cam_var to 1 so that no other thread is able to use camera Module (Else an error occurs) 
 	image = np.empty((640*480*3), dtype=np.uint8)						# initialize 1-D numpy array of same size as the camera resolution where image would be captured
 	camera.capture(image, 'bgr')								# capture image in image array as BGR
-	image = image.reshape((640,480,3))							# reshape the original array to 3-D array for further application of that image
+	image = image.reshape((480,640,3))							# reshape the original array to 3-D array for further application of that image
 	camera.close()										# Close camera Module
 	time_face = datetime.datetime.now()							# set time_face as current time 
 	cam_var = 0										# Set cam_var to 0 so that other threads can now use the camera 
@@ -86,15 +87,14 @@ def face_detected(faces, image, dat):
 	"""
 	This function marks face on the image and sends image to mobile
 	"""
-
 	print "faces detected"
 	for (x,y,w,h) in faces:
 		cv2.rectangle(image,(x,y),(x+w,y+h),(255,0,0),1)					# Draw rectangle around face	
-	cv2.imwrite('/home/pi/Documents/Raspberrypi/image_%s.jpg' % dat, image)				# save image
-	thumbnail = image.reshape((20, 20))
-	cv2.imwrite('/home/pi/Documents/Raspberrypi/thumb_%s.jpg' % dat, thumbnail)
+	cv2.imwrite(os.path.join(os.getcwd(),'image_%s.jpg' % dat), image)				# save image
+	thumbnail = cv2.resize(image, (133, 100))
+	cv2.imwrite(os.path.join(os.getcwd(),'thumb_%s.jpg' % dat), thumbnail)
 	git_push(dat)											# push to git
-	send_to_phone(dat, "Face Detected")								# send to mobile
+	send_to_phone(dat, "Faces have been detected!!")								# send to mobile
 
 
 def take_photo_door():
@@ -108,22 +108,21 @@ def take_photo_door():
 	
 	if (datetime.datetime.now() - time_face).seconds > 1  and cam_var == 0 :		
 		faces, image = capture()
-		dat = str(datetime.datetime.now())
+		dat = time.strftime("%d-%m-%Y_%H:%M:%S")
 
 		if len(faces) > 0 :
 			face_detected(faces, image, dat)
 
-		elif (datetime.datetime.now() - time_door).seconds >= 10 or start_door == 0:
+		elif (datetime.datetime.now() - time_door).seconds >= 15 or start_door == 0:
 			print "taking photo!!"
 			start_door = 1
-			dat = datetime.datetime.now().strftime('%s')
-			cv2.imwrite('/home/pi/Documents/Raspberrypi/image_%s.jpg' % dat, image)
-			thumbnail = image.reshape((20, 20))
-			cv2.imwrite('/home/pi/Documents/Raspberrypi/thumb_%s.jpg' % dat, thumbnail)
+			cv2.imwrite(os.path.join(os.getcwd(),'image_%s.jpg' % dat), image)
+			thumbnail = cv2.resize(image, (133, 100))
+			cv2.imwrite(os.path.join(os.getcwd(),'thumb_%s.jpg' % dat), thumbnail)
 			print "A photo has been captured!!"
 			time_door = datetime.datetime.now()							# Save current time in time_door so that counter starts again
 			git_push(dat)										# Push to git
-			send_to_phone(dat, "Sent from RaspberryPi")						# Send image to phone
+			send_to_phone(dat, "Someone opened your Locker!!")						# Send image to phone
 
 
 def take_photo_motion(last_motion):
@@ -137,20 +136,20 @@ def take_photo_motion(last_motion):
 	
 	if (datetime.datetime.now() - time_face).seconds > 1  and cam_var == 0 :		
 		faces, image = capture()
-		dat = str(datetime.datetime.now())
+		dat = time.strftime("%d-%m-%Y_%H:%M:%S")
 
 		if len(faces) > 0 :
 			face_detected(faces, image, dat)
 
-		elif (datetime.datetime.now() - time_motion).seconds > 2 or last_motion == 0:
+		elif (datetime.datetime.now() - time_motion).seconds > 5 or last_motion == 0:
 			print "taking photo!!"
-			cv2.imwrite('/home/pi/Documents/Raspberrypi/image_%s.jpg' % dat, image)			# Save image
-			thumbnail = image.reshape((20, 20))
-			cv2.imwrite('/home/pi/Documents/Raspberrypi/thumb_%s.jpg' % dat, thumbnail)
+			cv2.imwrite(os.path.join(os.getcwd(),'image_%s.jpg' % dat), image)			# Save image
+			thumbnail = cv2.resize(image, (133, 100))
+			cv2.imwrite(os.path.join(os.getcwd(),'thumb_%s.jpg' % dat), thumbnail)
 			print "A photo has been captured!!"
 			time_motion = datetime.datetime.now()							# Save current time in time_motion so that counter starts again 
 			git_push(dat)										# Push to git
-			send_to_phone(dat, "Sent from RaspberryPi")						# Send image to phone
+			send_to_phone(dat, "Someone got to your Locker!!")						# Send image to phone
 
 
 class DoorThread (threading.Thread):
@@ -217,6 +216,7 @@ DOOR_SENSOR_PIN = 4
 DOOR_LED_PIN = 10
 MOTION_SENSOR_PIN = 14
 MOTION_LED_PIN = 21
+LED_BULB_PIN = 13
 
 
 GPIO.setup(DOOR_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)					# Set up the door sensor pin
@@ -229,9 +229,11 @@ GPIO.output(DOOR_LED_PIN, False)								# Initialize it to False so it doesnot g
 GPIO.setup(MOTION_LED_PIN, GPIO.OUT)								# Set up the Motion Sensor LED pin
 GPIO.output(MOTION_LED_PIN, False)								# Initialize it to False so it doesnot glow
 
+GPIO.setup(LED_BULB_PIN, GPIO.OUT)
+GPIO.output(LED_BULB_PIN, True)
 
 # Define Face detection classifier from the xml file
-face_cascade = cv2.CascadeClassifier('/home/pi/Documents/haarcascade_frontalface_default.xml') 
+face_cascade = cv2.CascadeClassifier(os.path.join(os.getcwd(),'haarcascade_frontalface_default.xml')) 
 
 thread_no = 0											# Thread number 
 start_door = 0											# Variable to mark if door has just been open
@@ -240,16 +242,22 @@ cam_var = 0											# Variable to ensure
 time_door = datetime.datetime.now()
 time_motion = datetime.datetime.now()
 time_face = datetime.datetime.now()
+time_activity = datetime.datetime.now()
 last_motion = 0
 
 try :
 	while True :
+		if (datetime.datetime.now() - time_activity).seconds > 10:
+			GPIO.output(LED_BULB_PIN, True)
+		
 		door_input = inp = GPIO.input(DOOR_SENSOR_PIN)							# door magnet sensor
 		motion_input = GPIO.input(MOTION_SENSOR_PIN)							# motion sensor
 
-		if motion_input == 1 and door_input == 1 :
+		if motion_input == 1 and door_input == 1 :			
 			GPIO.output(DOOR_LED_PIN, True)
 			GPIO.output(MOTION_LED_PIN, True)
+			GPIO.output(LED_BULB_PIN, False)
+			time_activity = datetime.datetime.now()
 			door_thread = DoorThread(thread_no, "Thread-%s" % thread_no, thread_no)
 			thread_no += 1
 			door_thread.start()		
@@ -257,6 +265,8 @@ try :
 		elif motion_input == 1 and door_input == 0 :
 			GPIO.output(DOOR_LED_PIN, False)
 			GPIO.output(MOTION_LED_PIN, True)
+			GPIO.output(LED_BULB_PIN, False)
+			time_activity = datetime.datetime.now()
 			motion_thread = MotionThread(thread_no, "Thread-%s" % thread_no, thread_no, last_motion)
 			thread_no += 1
 			motion_thread.start()
